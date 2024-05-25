@@ -9,6 +9,7 @@ import os
 import psutil
 import argparse
 import sys
+import humanize
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
@@ -51,21 +52,21 @@ def main():
                 continue
             try:
                 csum = sha256sum(f)
+                size_on_disk = f.stat().st_size
                 path_in_s3 = str(ROOT_S3_CAS / csum[0] / csum[1] / csum)
                 try:
                     obj = s3_client.get_object(Bucket=args.bucket, Key=path_in_s3)
-                    if (
-                        "ContentLength" in obj
-                        and obj["ContentLength"] == f.stat().st_size
-                    ):
+                    if "ContentLength" in obj and obj["ContentLength"] == size_on_disk:
                         logging.info(
-                            f"Skipping {f.absolute()} because it's already in S3 as {path_in_s3}"
+                            f"Skipping {f.absolute()} ({humanize.naturalsize(size_on_disk)}) because it's already in S3 as {path_in_s3}"
                         )
                         continue
                 except s3_client.exceptions.NoSuchKey:
                     pass
                 # TODO: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3/object/checksum_sha256.html
-                logging.info(f"uploading {f} to {path_in_s3}")
+                logging.info(
+                    f"uploading {f} ({humanize.naturalsize(size_on_disk)}) to {path_in_s3}"
+                )
 
                 response = s3_client.upload_file(f.absolute(), args.bucket, path_in_s3)
                 print("success!")
