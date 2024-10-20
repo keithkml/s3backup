@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import hashlib
 import logging
 from pathlib import Path
+import re
 import boto3
 from botocore.exceptions import ClientError
 import os
@@ -45,6 +46,9 @@ def main():
     parser.add_argument("dirs", nargs="+")
     parser.add_argument("--battery", action="store_true")
     parser.add_argument("--output-csv")
+    parser.add_argument(
+        "--exclude-regex", default=r"\..*|.*~|.*_tmp\..*|.*_Proxy\..*|.*_thumbnailer_.*"
+    )
 
     args = parser.parse_args()
     dirs = [Path(dir) for dir in args.dirs]
@@ -61,7 +65,9 @@ def main():
             FileToProcess(path=f.absolute(), size=f.stat().st_size)
             for dir in dirs
             for f in dir.glob("**/*")
-            if not (f.is_dir() or f.is_symlink())
+            if not (
+                f.is_dir() or f.is_symlink() or re.fullmatch(args.exclude_regex, f.name)
+            )
         ),
         key=lambda f: str(f.path),
     )
